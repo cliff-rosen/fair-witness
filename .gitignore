@@ -3,6 +3,17 @@ backend/venv/
 __pycache__/
 *.pyc
 backend/.env
+backend/.env.production
+backend/BUILD_VERSION
+
+# Elastic Beanstalk CLI local state
+backend/.elasticbeanstalk/
+
+# Phase 5 infra scratch (AWS CLI param files)
+.fw-tmp/
+
+# Isolated venv holding the EB CLI
+.ebcli-venv/
 
 # Node
 frontend/node_modules/

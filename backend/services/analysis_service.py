@@ -29,6 +29,7 @@ from agents.issue_map_builder import IssueMapBuilderPromptCaller, brief_issue_ma
 from agents.planner import PlannerPromptCaller
 from agents.synthesizer import SynthesizerPromptCaller
 from config.settings import settings
+from services import report_repository
 from schemas.analysis import (
     BiasReport,
     ClaimAnalysis,
@@ -51,7 +52,10 @@ class AnalysisService:
         self._semaphore = asyncio.Semaphore(settings.MAX_PARALLEL_EVALUATORS)
 
     async def analyze_stream(
-        self, article: ExtractedArticle
+        self,
+        article: ExtractedArticle,
+        content_hash: str | None = None,
+        source_url: str | None = None,
     ) -> AsyncGenerator[AnalysisEvent, None]:
         """Run the pipeline, yielding events as each stage progresses."""
         try:
@@ -124,15 +128,30 @@ class AnalysisService:
                 f"(presentation={overall.presentation_score}, "
                 f"substantive={overall.substantive_score}) label='{overall.fairness_label}'"
             )
+
+            # Persist for a shareable link + Recent feed (best-effort — storage
+            # must never break the analysis; stamps report_id/created_at on it).
+            if report_repository.is_enabled() and content_hash:
+                try:
+                    await report_repository.save_report(report, content_hash, source_url)
+                    logger.info(f"Stored shareable report {report.report_id}")
+                except Exception as e:
+                    logger.error(f"Failed to store report: {e}", exc_info=True)
+
             yield AnalysisEvent(type="report", report=report)
 
         except Exception as e:
             logger.error(f"Analysis pipeline failed: {e}", exc_info=True)
             yield AnalysisEvent(type="error", message=str(e))
 
-    async def analyze(self, article: ExtractedArticle) -> BiasReport:
+    async def analyze(
+        self,
+        article: ExtractedArticle,
+        content_hash: str | None = None,
+        source_url: str | None = None,
+    ) -> BiasReport:
         """Blocking variant: drain the stream and return the final report."""
-        async for event in self.analyze_stream(article):
+        async for event in self.analyze_stream(article, content_hash, source_url):
             if event.type == "report" and event.report is not None:
                 return event.report
             if event.type == "error":

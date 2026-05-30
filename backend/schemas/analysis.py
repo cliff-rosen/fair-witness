@@ -130,6 +130,16 @@ class ExtractedArticle(BaseModel):
     text: str
     source_url: Optional[str] = None
     byline: Optional[str] = None
+    site_name: Optional[str] = Field(
+        default=None, description="Publication / site name (e.g. 'Politico')."
+    )
+    published: Optional[str] = Field(
+        default=None, description="Publication date as found on the page (raw string)."
+    )
+    note: Optional[str] = Field(
+        default=None,
+        description="Optional submitter note/context (shown on the report, not analyzed).",
+    )
     word_count: int
     truncated: bool = Field(
         default=False,
@@ -358,3 +368,11 @@ class BiasReport(BaseModel):
     dimensions: List[DimensionAssessment]
     claims: List[ClaimAssessment]
     overall: OverallAssessment
+
+    # Set once the report is persisted for sharing (see services/report_repository.py).
+    report_id: Optional[str] = Field(
+        default=None, description="Unguessable share id; present only on stored reports."
+    )
+    created_at: Optional[str] = Field(
+        default=None, description="UTC ISO-8601 timestamp when the report was stored."
+    )

@@ -1,10 +1,11 @@
 from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from config import setup_logging, settings
-from routers import analysis
+from routers import admin, analysis, reports
 
 logger = setup_logging()
 logger.info(f"{settings.APP_NAME} v{settings.SETTING_VERSION} starting")
@@ -20,6 +21,23 @@ app.add_middleware(
 )
 
 app.include_router(analysis.router)
+app.include_router(reports.router)
+app.include_router(admin.router)
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    """Create DB tables if configured. Best-effort: a DB problem shouldn't stop
+    the app from serving health/analysis — persistence just degrades."""
+    if not settings.DB_CONFIGURED:
+        logger.warning("DB not configured — reports/recent/tracking disabled")
+        return
+    try:
+        from database import init_db
+
+        await init_db()
+    except Exception as e:
+        logger.error(f"DB init failed (persistence disabled this run): {e}")
 
 
 @app.get("/")
@@ -40,7 +58,9 @@ async def health_check():
 @app.exception_handler(RequestValidationError)
 async def request_validation_exception_handler(request: Request, exc: RequestValidationError):
     logger.warning(f"RequestValidationError in {request.url.path}: {exc.errors()}")
-    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    # jsonable_encoder: Pydantic v2 puts a raw ValueError in errors()[..]['ctx'],
+    # which json.dumps can't serialize — without this the 422 crashes into a 500.
+    return JSONResponse(status_code=422, content={"detail": jsonable_encoder(exc.errors())})
 
 
 @app.exception_handler(Exception)

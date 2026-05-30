@@ -15,7 +15,7 @@ const developmentSettings: Settings = {
 }
 
 const productionSettings: Settings = {
-  apiUrl: '/api-proxy', // configure for your deploy
+  apiUrl: 'https://fairwitness-api.orchestratorstudios.ai',
   appName: 'Fair Witness',
 }
 

@@ -16,11 +16,12 @@ export function subscribeToSSE<T>(
   options?: {
     method?: 'GET' | 'POST'
     body?: unknown
+    headers?: Record<string, string>
     onError?: (error: Error) => void
     onComplete?: () => void
   },
 ): () => void {
-  const { method = 'GET', body, onError, onComplete } = options ?? {}
+  const { method = 'GET', body, headers = {}, onError, onComplete } = options ?? {}
   const url = `${settings.apiUrl}${endpoint}`
   const controller = new AbortController()
 
@@ -31,6 +32,7 @@ export function subscribeToSSE<T>(
         headers: {
           Accept: 'text/event-stream',
           ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+          ...headers,
         },
         ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
         signal: controller.signal,
@@ -50,7 +52,9 @@ export function subscribeToSSE<T>(
         } catch {
           /* non-JSON error body */
         }
-        throw new Error(detail)
+        const err = new Error(detail) as Error & { status?: number }
+        err.status = response.status
+        throw err
       }
 
       const reader = response.body?.getReader()

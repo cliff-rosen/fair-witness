@@ -9,12 +9,32 @@
 
 import { api } from './index'
 import { subscribeToSSE } from './streamUtils'
-import type { AnalysisEvent, BiasReport } from '../../types/analysis'
+import { passphraseHeaders } from '../passphrase'
+import type { AnalysisEvent, BiasReport, ReportSummary } from '../../types/analysis'
 
 export interface AnalyzeRequest {
   url?: string
   text?: string
   title?: string
+  // Optional provenance the submitter can attach to pasted text:
+  source_url?: string
+  site_name?: string
+  byline?: string
+  published?: string
+  note?: string
+}
+
+export interface PrecheckResult {
+  existing: ReportSummary | null
+}
+
+/**
+ * Cheap dedup check before running: has this URL/text already been analyzed?
+ * Public (no passphrase) and never spends tokens.
+ */
+export async function precheckArticle(request: AnalyzeRequest): Promise<PrecheckResult> {
+  const response = await api.post<PrecheckResult>('/api/analysis/precheck', request)
+  return response.data
 }
 
 export async function analyzeArticle(request: AnalyzeRequest): Promise<BiasReport> {
@@ -25,12 +45,14 @@ export async function analyzeArticle(request: AnalyzeRequest): Promise<BiasRepor
 export interface StreamHandlers {
   onEvent: (event: AnalysisEvent) => void
   onError?: (message: string) => void
+  /** Called when the backend rejects the passphrase (HTTP 401). */
+  onAuthError?: (message: string) => void
   onDone?: () => void
 }
 
 /**
  * Stream analysis events via the shared SSE helper. Returns a cleanup function
- * that aborts the request.
+ * that aborts the request. The passphrase (when set) rides along as a header.
  */
 export function streamAnalysis(
   request: AnalyzeRequest,
@@ -47,7 +69,12 @@ export function streamAnalysis(
     {
       method: 'POST',
       body: request,
-      onError: (error) => handlers.onError?.(error.message),
+      headers: passphraseHeaders(),
+      onError: (error) => {
+        const status = (error as Error & { status?: number }).status
+        if (status === 401) handlers.onAuthError?.(error.message)
+        else handlers.onError?.(error.message)
+      },
       onComplete: handlers.onDone,
     },
   )

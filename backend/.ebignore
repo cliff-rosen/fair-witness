@@ -1,0 +1,13 @@
+# When this file exists, the EB CLI uses it INSTEAD of .gitignore to decide what
+# to bundle. So .env.production and BUILD_VERSION (both git-ignored) still ship —
+# that's intentional: prod secrets + the version stamp must be in the deploy zip.
+# Everything listed here is EXCLUDED from the bundle.
+.venv
+venv
+.env
+.env.local
+__pycache__
+*.pyc
+.pytest_cache
+logs
+_smoke_test.py

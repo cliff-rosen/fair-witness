@@ -68,6 +68,9 @@ export interface ExtractedArticle {
   text: string
   source_url: string | null
   byline: string | null
+  site_name: string | null
+  published: string | null
+  note: string | null
   word_count: number
   truncated: boolean
 }
@@ -162,6 +165,20 @@ export interface BiasReport {
   dimensions: DimensionAssessment[]
   claims: ClaimAssessment[]
   overall: OverallAssessment
+  // Present only on stored/shared reports (see backend report_store).
+  report_id?: string | null
+  created_at?: string | null
+}
+
+// Lightweight metadata for feed/card listings (Recent, Highlights).
+export interface ReportSummary {
+  report_id: string
+  title: string
+  topic: string
+  overall_score: number
+  fairness_label: FairnessLabel
+  political_lean: PoliticalLean
+  created_at?: string | null
 }
 
 // --- Streaming events (mirror backend/schemas/events.py) ---

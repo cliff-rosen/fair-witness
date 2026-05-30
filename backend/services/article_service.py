@@ -5,6 +5,7 @@ Owns turning a user request (a URL or pasted text) into a clean
 body text; pasted text is normalized directly.
 """
 
+import asyncio
 import logging
 import re
 from typing import Optional
@@ -29,64 +30,280 @@ class ArticleService:
     def __init__(self) -> None:
         self.max_chars = settings.MAX_ARTICLE_CHARS
 
+    _MIN_BODY = 250  # below this we treat the page as blocked/stub and try the reader
+
     async def from_url(self, url: str) -> ExtractedArticle:
         logger.info(f"Fetching article from url={url}")
-        try:
-            async with httpx.AsyncClient(
-                timeout=20.0, follow_redirects=True, headers={"User-Agent": _USER_AGENT}
-            ) as client:
-                resp = await client.get(url)
-                resp.raise_for_status()
-                html = resp.text
-        except httpx.HTTPError as e:
-            logger.warning(f"Failed to fetch url={url}: {e}")
-            raise ValueError(f"Could not fetch the URL: {e}") from e
 
-        title, byline, body = self._extract_from_html(html)
-        if not body.strip():
-            raise ValueError("Could not extract readable article text from that URL.")
+        # 1) Direct fetch — fast, and gives us rich og/JSON-LD metadata.
+        html = await self._fetch_direct(url)
+        if html:
+            meta = self._extract_from_html(html)
+            if self._usable(meta["body"]):
+                return self._finalize(
+                    title=meta["title"] or url,
+                    text=meta["body"],
+                    source_url=url,
+                    byline=meta["byline"],
+                    site_name=meta["site_name"] or self._domain(url),
+                    published=meta["published"],
+                )
+            logger.info(f"Direct fetch unusable for {url}; trying reader fallback")
 
-        return self._finalize(title=title or url, text=body, source_url=url, byline=byline)
+        # 2) Reader-service fallback (handles JS-heavy / Cloudflare / soft paywalls).
+        reader = await self._fetch_via_reader(url)
+        if reader and self._usable(reader["body"]):
+            return self._finalize(
+                title=reader["title"] or url,
+                text=reader["body"],
+                source_url=url,
+                byline=None,
+                site_name=self._domain(url),
+                published=reader["published"],
+            )
+
+        # 3) Both failed — give an actionable message instead of a raw HTTP error.
+        raise ValueError(
+            "Couldn't read that page automatically. Some sites (e.g. archive.is, or "
+            "paywalled / bot-protected pages) block readers. Try the original article's "
+            "URL, or switch to “Paste text” and paste the article directly."
+        )
 
     def from_text(self, text: str, title: Optional[str] = None) -> ExtractedArticle:
         if not text or not text.strip():
             raise ValueError("Article text is empty.")
         cleaned = self._normalize_whitespace(text)
         derived_title = title or self._derive_title(cleaned)
-        return self._finalize(title=derived_title, text=cleaned, source_url=None, byline=None)
+        return self._finalize(
+            title=derived_title, text=cleaned, source_url=None, byline=None,
+            site_name=None, published=None,
+        )
+
+    # ------------------------------------------------------------------
+    # Fetching
+    # ------------------------------------------------------------------
+
+    async def _fetch_direct(self, url: str) -> Optional[str]:
+        """Direct fetch with browser-like headers + one retry on soft blocks.
+        Returns HTML, or None if blocked/errored (caller falls back to the reader)."""
+        headers = {
+            "User-Agent": _USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Upgrade-Insecure-Requests": "1",
+        }
+        try:
+            async with httpx.AsyncClient(
+                timeout=20.0, follow_redirects=True, headers=headers
+            ) as client:
+                resp = await client.get(url)
+                if resp.status_code in (429, 403, 503):
+                    await asyncio.sleep(1.5)  # one polite retry for soft limits
+                    resp = await client.get(url)
+                if resp.status_code >= 400:
+                    logger.warning(f"Direct fetch {url} -> HTTP {resp.status_code}")
+                    return None
+                return resp.text
+        except httpx.HTTPError as e:
+            logger.warning(f"Direct fetch error for {url}: {e}")
+            return None
+
+    async def _fetch_via_reader(self, url: str) -> Optional[dict]:
+        """Fallback through a reader service (Jina) that renders JS/Cloudflare
+        pages server-side and returns clean text. Returns parsed dict or None."""
+        base = settings.READER_FALLBACK_URL.strip()
+        if not base:
+            return None
+        reader_url = base.rstrip("/") + "/" + url
+        logger.info(f"Reader fallback for {url}")
+        try:
+            async with httpx.AsyncClient(
+                timeout=40.0, follow_redirects=True,
+                headers={"User-Agent": _USER_AGENT, "Accept": "text/plain"},
+            ) as client:
+                resp = await client.get(reader_url)
+                if resp.status_code >= 400:
+                    logger.warning(f"Reader fetch {url} -> HTTP {resp.status_code}")
+                    return None
+                return self._parse_reader(resp.text)
+        except httpx.HTTPError as e:
+            logger.warning(f"Reader fetch error for {url}: {e}")
+            return None
+
+    def _parse_reader(self, text: str) -> dict:
+        """Parse Jina reader output (Title: / Published Time: / Markdown Content:)."""
+        title = None
+        published = None
+        marker = re.search(r"(?im)^Markdown Content:\s*$", text)
+        header = text[: marker.start()] if marker else text
+        body = text[marker.end():] if marker else text
+        for line in header.splitlines():
+            low = line.lower()
+            if low.startswith("title:") and not title:
+                title = line.split(":", 1)[1].strip() or None
+            elif low.startswith("published time:") and not published:
+                published = line.split(":", 1)[1].strip() or None
+        body = self._normalize_whitespace(self._strip_markdown(body))
+        return {"title": title, "published": published, "body": body}
+
+    # Phrases that mean we got an anti-bot / challenge / error page, not an article.
+    _BLOCK_MARKERS = (
+        "complete the captcha",
+        "security check to access",
+        "are you a human",
+        "verify you are human",
+        "please enable javascript",
+        "just a moment",
+        "attention required",
+        "access denied",
+        "checking your browser",
+        "ddos protection",
+        "captcha proves you are a human",
+    )
+
+    def _usable(self, body: str) -> bool:
+        """Enough real text, and not an anti-bot/CAPTCHA page."""
+        b = body.strip()
+        if len(b) < self._MIN_BODY:
+            return False
+        low = b.lower()
+        return not any(m in low for m in self._BLOCK_MARKERS)
+
+    @staticmethod
+    def _strip_markdown(md: str) -> str:
+        md = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", md)          # images
+        md = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", md)      # links -> link text
+        out = [ln for ln in md.splitlines() if not re.match(r"^\s*https?://\S+\s*$", ln)]
+        return "\n".join(out)
 
     # ------------------------------------------------------------------
     # Internals
     # ------------------------------------------------------------------
 
-    def _extract_from_html(self, html: str):
+    def _extract_from_html(self, html: str) -> dict:
         soup = BeautifulSoup(html, "html.parser")
 
-        # Strip non-content elements.
+        # JSON-LD is the most reliable source for author/publisher/date — read it
+        # BEFORE stripping <script> tags.
+        ld = self._parse_json_ld(soup)
+
+        def _meta(*, name=None, prop=None) -> Optional[str]:
+            attrs = {"name": name} if name else {"property": prop}
+            tag = soup.find("meta", attrs=attrs)
+            v = tag.get("content").strip() if tag and tag.get("content") else None
+            return v or None
+
+        # Strip non-content elements before pulling body text.
         for tag in soup(["script", "style", "noscript", "header", "footer", "nav", "aside", "form"]):
             tag.decompose()
 
-        title = None
-        if soup.title and soup.title.string:
-            title = soup.title.string.strip()
-        og_title = soup.find("meta", property="og:title")
-        if og_title and og_title.get("content"):
-            title = og_title["content"].strip()
+        def _as_text(v):
+            """Flatten JSON-LD/meta values (which may be lists/dicts) to a string."""
+            if v is None:
+                return None
+            if isinstance(v, str):
+                return v.strip() or None
+            if isinstance(v, dict):
+                return _as_text(v.get("name"))
+            if isinstance(v, list):
+                parts = [_as_text(x) for x in v]
+                parts = [p for p in parts if p]
+                return ", ".join(parts) or None
+            return str(v)
 
-        byline = None
-        author_meta = soup.find("meta", attrs={"name": "author"})
-        if author_meta and author_meta.get("content"):
-            byline = author_meta["content"].strip()
+        title = _meta(prop="og:title")
+        if not title and soup.title and soup.title.string:
+            title = soup.title.string.strip()
+
+        site_name = _as_text(_meta(prop="og:site_name") or ld.get("site_name"))
+
+        byline = _as_text(
+            ld.get("author")
+            or _meta(name="author")
+            or _meta(name="byl")            # NYT
+            or _meta(name="parsely-author")
+            or _meta(prop="article:author")
+        )
+        # article:author is sometimes a URL — ignore those.
+        if byline and byline.startswith("http"):
+            byline = None
+
+        published = _as_text(
+            _meta(prop="article:published_time")
+            or ld.get("published")
+            or _meta(name="date")
+            or _meta(name="pubdate")
+            or _meta(name="article:published_time")
+        )
+        if not published:
+            time_tag = soup.find("time")
+            if time_tag:
+                published = (time_tag.get("datetime") or time_tag.get_text(strip=True)) or None
 
         # Prefer paragraphs inside an <article>, else the densest container.
         container = soup.find("article") or soup.find("main") or soup.body or soup
         paragraphs = [p.get_text(" ", strip=True) for p in container.find_all("p")]
         paragraphs = [p for p in paragraphs if len(p) > 40]  # drop boilerplate snippets
-        body = "\n\n".join(paragraphs)
-        body = self._normalize_whitespace(body)
-        return title, byline, body
+        body = self._normalize_whitespace("\n\n".join(paragraphs))
+        return {
+            "title": title,
+            "byline": byline,
+            "site_name": site_name,
+            "published": published,
+            "body": body,
+        }
 
-    def _finalize(self, *, title: str, text: str, source_url, byline) -> ExtractedArticle:
+    @staticmethod
+    def _parse_json_ld(soup: BeautifulSoup) -> dict:
+        """Best-effort author/publisher/date from schema.org JSON-LD blocks."""
+        import json
+
+        out: dict = {}
+
+        def _name(v):
+            if isinstance(v, dict):
+                return v.get("name")
+            if isinstance(v, list) and v:
+                return _name(v[0])
+            if isinstance(v, str):
+                return v
+            return None
+
+        for tag in soup.find_all("script", attrs={"type": "application/ld+json"}):
+            raw = tag.string or tag.get_text()
+            if not raw:
+                continue
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+            candidates = data if isinstance(data, list) else [data]
+            if isinstance(data, dict) and isinstance(data.get("@graph"), list):
+                candidates = data["@graph"]
+            for node in candidates:
+                if not isinstance(node, dict):
+                    continue
+                if "author" not in out and node.get("author"):
+                    out["author"] = _name(node.get("author"))
+                if "published" not in out and node.get("datePublished"):
+                    out["published"] = node.get("datePublished")
+                if "site_name" not in out and node.get("publisher"):
+                    out["site_name"] = _name(node.get("publisher"))
+        return {k: v for k, v in out.items() if v}
+
+    @staticmethod
+    def _domain(url: str) -> Optional[str]:
+        try:
+            from urllib.parse import urlsplit
+
+            host = urlsplit(url).netloc.lower()
+            return host[4:] if host.startswith("www.") else host or None
+        except Exception:
+            return None
+
+    def _finalize(
+        self, *, title: str, text: str, source_url, byline, site_name=None, published=None
+    ) -> ExtractedArticle:
         truncated = False
         if len(text) > self.max_chars:
             text = text[: self.max_chars]
@@ -96,7 +313,9 @@ class ArticleService:
             title=title.strip()[:300],
             text=text,
             source_url=source_url,
-            byline=byline,
+            byline=(byline.strip()[:200] if byline else None),
+            site_name=(site_name.strip()[:120] if site_name else None),
+            published=(published.strip()[:60] if published else None),
             word_count=word_count,
             truncated=truncated,
         )

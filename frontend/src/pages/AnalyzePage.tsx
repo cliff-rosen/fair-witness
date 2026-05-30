@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react'
-import { streamAnalysis } from '../lib/api/analysisApi'
+import { Link } from 'react-router-dom'
+import { precheckArticle, streamAnalysis } from '../lib/api/analysisApi'
+import { clearPassphrase, getPassphrase, setPassphrase } from '../lib/passphrase'
 import type {
   AnalysisPlan,
   BiasReport,
@@ -8,10 +10,12 @@ import type {
   ExtractedArticle,
   IssueMap,
   PlannedDimension,
+  ReportSummary,
 } from '../types/analysis'
 import OrchestrationProgress, { type Phase } from '../components/OrchestrationProgress'
 import ReportView from '../components/ReportView'
-import MethodologyModal from '../components/MethodologyModal'
+import PassphraseModal from '../components/PassphraseModal'
+import ShareBar from '../components/ShareBar'
 
 type Mode = 'url' | 'text'
 
@@ -22,9 +26,27 @@ export default function AnalyzePage() {
   const [url, setUrl] = useState('')
   const [text, setText] = useState('')
 
+  // Optional provenance the user can attach to pasted text.
+  const [showMeta, setShowMeta] = useState(false)
+  const [meta, setMeta] = useState({
+    title: '',
+    source_url: '',
+    site_name: '',
+    byline: '',
+    published: '',
+    note: '',
+  })
+
   const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
-  const [showMethodology, setShowMethodology] = useState(false)
+
+  // Passphrase is asked at the moment of running (not on landing) and remembered.
+  const [showPassModal, setShowPassModal] = useState(false)
+  const [passError, setPassError] = useState<string | null>(null)
+
+  // Dedup: if this URL/text was already analyzed, offer it before spending tokens.
+  const [existing, setExisting] = useState<ReportSummary | null>(null)
+  const [checking, setChecking] = useState(false)
 
   const [article, setArticle] = useState<ExtractedArticle | null>(null)
   const [plan, setPlan] = useState<AnalysisPlan | null>(null)
@@ -40,6 +62,7 @@ export default function AnalyzePage() {
 
   function reset() {
     setError(null)
+    setExisting(null)
     setArticle(null)
     setPlan(null)
     setIssueMap(null)
@@ -49,16 +72,60 @@ export default function AnalyzePage() {
     setReport(null)
   }
 
-  function start() {
-    const request = mode === 'url' ? { url: url.trim() } : { text: text.trim() }
-    if (mode === 'url' && !request.url) {
+  function buildRequest() {
+    if (mode === 'url') return { url: url.trim() }
+    const req: Record<string, string> = { text: text.trim() }
+    for (const [k, v] of Object.entries(meta)) {
+      if (v.trim()) req[k] = v.trim()
+    }
+    return req
+  }
+
+  async function start() {
+    setError(null)
+    setExisting(null)
+    if (mode === 'url' && !url.trim()) {
       setError('Enter a URL.')
       return
     }
-    if (mode === 'text' && !request.text) {
+    if (mode === 'text' && !text.trim()) {
       setError('Paste some article text.')
       return
     }
+
+    // Dedup check first — cheap, no passphrase, no tokens.
+    setChecking(true)
+    try {
+      const res = await precheckArticle(buildRequest())
+      if (res.existing) {
+        setExisting(res.existing)
+        return
+      }
+    } catch {
+      /* precheck is best-effort — fall through to running */
+    } finally {
+      setChecking(false)
+    }
+    proceed()
+  }
+
+  /** After validation + dedup: gate on the passphrase, then run. */
+  function proceed() {
+    if (!getPassphrase()) {
+      setPassError(null)
+      setShowPassModal(true)
+      return
+    }
+    runAnalysis()
+  }
+
+  function analyzeAnyway() {
+    setExisting(null)
+    proceed()
+  }
+
+  function runAnalysis() {
+    const request = buildRequest()
 
     reset()
     setPhase('ingesting')
@@ -110,7 +177,20 @@ export default function AnalyzePage() {
         setError(message)
         setPhase('error')
       },
+      onAuthError: () => {
+        clearPassphrase()
+        setPhase('idle')
+        setPassError('That passphrase wasn’t accepted. Try again.')
+        setShowPassModal(true)
+      },
     })
+  }
+
+  function onPassphraseSubmit(value: string) {
+    setPassphrase(value) // persist so API calls pick it up
+    setShowPassModal(false)
+    setPassError(null)
+    runAnalysis()
   }
 
   function cancel() {
@@ -129,12 +209,6 @@ export default function AnalyzePage() {
         <p className="mt-1 text-slate-500">
           Orchestrated fairness &amp; bias analysis for any article.
         </p>
-        <button
-          onClick={() => setShowMethodology(true)}
-          className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-medium text-slate-600 shadow-sm transition hover:border-indigo-200 hover:text-indigo-600"
-        >
-          <span aria-hidden>ⓘ</span> How it works
-        </button>
       </header>
 
       {/* Input card */}
@@ -174,13 +248,45 @@ export default function AnalyzePage() {
           />
         )}
 
+        {mode === 'text' && (
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => setShowMeta((s) => !s)}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+            >
+              {showMeta ? '− Hide source details' : '+ Add source details (optional)'}
+            </button>
+            {showMeta && (
+              <div className="mt-3 grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-2">
+                <Field label="Title" value={meta.title} onChange={(v) => setMeta({ ...meta, title: v })} placeholder="Article headline" />
+                <Field label="Original URL" value={meta.source_url} onChange={(v) => setMeta({ ...meta, source_url: v })} placeholder="https://… (e.g. the paywalled page)" />
+                <Field label="Publication" value={meta.site_name} onChange={(v) => setMeta({ ...meta, site_name: v })} placeholder="e.g. The New York Times" />
+                <Field label="Author" value={meta.byline} onChange={(v) => setMeta({ ...meta, byline: v })} placeholder="Byline" />
+                <Field label="Published" value={meta.published} onChange={(v) => setMeta({ ...meta, published: v })} placeholder="e.g. May 20, 2026" />
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-slate-500">Note (optional)</label>
+                  <textarea
+                    value={meta.note}
+                    onChange={(e) => setMeta({ ...meta, note: e.target.value })}
+                    rows={2}
+                    placeholder="Any context for readers — shown on the report, not part of the analysis."
+                    className="w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 flex items-center gap-3">
           {!running ? (
             <button
               onClick={start}
-              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+              disabled={checking}
+              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
             >
-              Analyze
+              {checking ? 'Checking…' : 'Analyze'}
             </button>
           ) : (
             <button
@@ -206,6 +312,29 @@ export default function AnalyzePage() {
         {error && (
           <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
         )}
+
+        {existing && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm">
+            <p className="font-semibold text-amber-800">This article was already analyzed.</p>
+            <p className="mt-0.5 text-amber-700">
+              “{existing.title}” — {existing.fairness_label} ({existing.overall_score}/100).
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <Link
+                to={`/r/${existing.report_id}`}
+                className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-indigo-700"
+              >
+                View existing analysis
+              </Link>
+              <button
+                onClick={analyzeAnyway}
+                className="text-sm font-medium text-slate-600 hover:text-slate-800"
+              >
+                Analyze again anyway
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Live orchestration */}
@@ -226,12 +355,46 @@ export default function AnalyzePage() {
 
       {/* Final report — uses the full width */}
       {phase === 'done' && report && (
-        <div className="mt-6">
+        <div className="mt-6 space-y-4">
+          {report.report_id && <ShareBar reportId={report.report_id} />}
           <ReportView report={report} />
         </div>
       )}
 
-      {showMethodology && <MethodologyModal onClose={() => setShowMethodology(false)} />}
+      {showPassModal && (
+        <PassphraseModal
+          onSubmit={onPassphraseSubmit}
+          onClose={() => setShowPassModal(false)}
+          error={passError}
+        />
+      )}
     </div>
   )
 }
+
+/** Small labeled text input used in the optional "source details" panel. */
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  placeholder?: string
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-500">{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+      />
+    </div>
+  )
+}
+
