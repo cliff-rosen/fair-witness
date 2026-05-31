@@ -31,6 +31,7 @@ from schemas.analysis import (
     Ring1Result,
 )
 from schemas.events import FairnessEvent
+from services import report_repository
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,15 @@ class FairnessService:
                 f"v2 analysis complete: coherence={verdict.coherence_score} "
                 f"correspondence={verdict.correspondence_score} overall={verdict.overall_score}"
             )
+
+            # Persist for sharing + Recent (best-effort; stamps report_id/created_at).
+            if report_repository.is_enabled() and content_hash:
+                try:
+                    await report_repository.save_report(report, content_hash, source_url)
+                    logger.info(f"Stored shareable report {report.report_id}")
+                except Exception as e:
+                    logger.error(f"Failed to store report: {e}", exc_info=True)
+
             yield FairnessEvent(type="report", report=report)
 
         except Exception as e:

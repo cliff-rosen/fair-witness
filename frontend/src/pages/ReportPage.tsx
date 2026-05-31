@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { getReport } from '../lib/api/reportApi'
 import ReportView from '../components/ReportView'
 import ShareBar from '../components/ShareBar'
-import type { BiasReport } from '../types/analysis'
+import type { FairnessReport } from '../types/analysis'
 
 type Status = 'loading' | 'ok' | 'notfound' | 'error'
 
@@ -13,7 +13,7 @@ type Status = 'loading' | 'ok' | 'notfound' | 'error'
  */
 export default function ReportPage() {
   const { id } = useParams<{ id: string }>()
-  const [report, setReport] = useState<BiasReport | null>(null)
+  const [report, setReport] = useState<FairnessReport | null>(null)
   const [status, setStatus] = useState<Status>('loading')
 
   useEffect(() => {

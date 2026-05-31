@@ -4,10 +4,10 @@
  */
 
 import { api } from './index'
-import type { BiasReport, ReportSummary } from '../../types/analysis'
+import type { FairnessReport, ReportSummary } from '../../types/analysis'
 
-export async function getReport(id: string): Promise<BiasReport> {
-  const response = await api.get<BiasReport>(`/api/reports/${id}`)
+export async function getReport(id: string): Promise<FairnessReport> {
+  const response = await api.get<FairnessReport>(`/api/reports/${id}`)
   return response.data
 }
 

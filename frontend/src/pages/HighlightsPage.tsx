@@ -19,10 +19,10 @@ export default function HighlightsPage() {
           .then((r): ReportSummary => ({
             report_id: r.report_id ?? id,
             title: r.article.title,
-            topic: r.plan.topic,
-            overall_score: r.overall.overall_score,
-            fairness_label: r.overall.fairness_label,
-            political_lean: r.overall.political_lean,
+            topic: r.argument.topic,
+            overall_score: r.verdict.overall_score,
+            fairness_label: r.verdict.fairness_label,
+            political_lean: r.verdict.political_lean,
             created_at: r.created_at,
           }))
           .catch(() => null),

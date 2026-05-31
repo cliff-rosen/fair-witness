@@ -2,20 +2,14 @@ import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { precheckArticle, streamAnalysis } from '../lib/api/analysisApi'
 import { clearPassphrase, getPassphrase, setPassphrase } from '../lib/passphrase'
-import type {
-  AnalysisPlan,
-  BiasReport,
-  ClaimAssessment,
-  DimensionAssessment,
-  ExtractedArticle,
-  IssueMap,
-  PlannedDimension,
-  ReportSummary,
-} from '../types/analysis'
-import OrchestrationProgress, { type Phase } from '../components/OrchestrationProgress'
+import type { FairnessReport, ReportSummary } from '../types/analysis'
+import PipelineProgress, { type Progress } from '../components/PipelineProgress'
 import ReportView from '../components/ReportView'
 import PassphraseModal from '../components/PassphraseModal'
 import ShareBar from '../components/ShareBar'
+
+type Phase = 'idle' | 'running' | 'done' | 'error'
+const EMPTY_PROGRESS: Progress = { stages: [], claims: 0, expected: 0 }
 
 type Mode = 'url' | 'text'
 
@@ -48,27 +42,17 @@ export default function AnalyzePage() {
   const [existing, setExisting] = useState<ReportSummary | null>(null)
   const [checking, setChecking] = useState(false)
 
-  const [article, setArticle] = useState<ExtractedArticle | null>(null)
-  const [plan, setPlan] = useState<AnalysisPlan | null>(null)
-  const [issueMap, setIssueMap] = useState<IssueMap | null>(null)
-  const [plannedDims, setPlannedDims] = useState<PlannedDimension[]>([])
-  const [completed, setCompleted] = useState<Map<string, DimensionAssessment>>(new Map())
-  const [claims, setClaims] = useState<ClaimAssessment[] | null>(null)
-  const [report, setReport] = useState<BiasReport | null>(null)
+  const [progress, setProgress] = useState<Progress>(EMPTY_PROGRESS)
+  const [report, setReport] = useState<FairnessReport | null>(null)
 
   const cancelRef = useRef<null | (() => void)>(null)
 
-  const running = phase !== 'idle' && phase !== 'done' && phase !== 'error'
+  const running = phase === 'running'
 
   function reset() {
     setError(null)
     setExisting(null)
-    setArticle(null)
-    setPlan(null)
-    setIssueMap(null)
-    setPlannedDims([])
-    setCompleted(new Map())
-    setClaims(null)
+    setProgress(EMPTY_PROGRESS)
     setReport(null)
   }
 
@@ -128,50 +112,32 @@ export default function AnalyzePage() {
     const request = buildRequest()
 
     reset()
-    setPhase('ingesting')
+    setPhase('running')
 
     cancelRef.current = streamAnalysis(request, {
       onEvent: (event) => {
-        switch (event.type) {
-          case 'ingested':
-            if (event.article) setArticle(event.article)
-            setPhase('planning')
-            break
-          case 'plan':
-            if (event.plan) setPlan(event.plan)
-            setPhase('mapping')
-            break
-          case 'issue_map':
-            if (event.issue_map) setIssueMap(event.issue_map)
-            break
-          case 'dimensions_planned':
-            if (event.dimensions) setPlannedDims(event.dimensions)
-            setPhase('evaluating')
-            break
-          case 'dimension_complete':
-            if (event.assessment) {
-              setCompleted((prev) => {
-                const next = new Map(prev)
-                next.set(event.assessment!.key, event.assessment!)
-                return next
-              })
-            }
-            break
-          case 'claims_analyzed':
-            setClaims(event.claims ?? [])
-            break
-          case 'synthesizing':
-            setPhase('synthesizing')
-            break
-          case 'report':
-            if (event.report) setReport(event.report)
-            setPhase('done')
-            break
-          case 'error':
-            setError(event.message || 'Analysis failed')
-            setPhase('error')
-            break
+        const t = event.type
+        if (t === 'report') {
+          if (event.report) setReport(event.report)
+          setPhase('done')
+          return
         }
+        if (t === 'error') {
+          setError(event.message || 'Analysis failed')
+          setPhase('error')
+          return
+        }
+        if (t === 'claim_check') {
+          setProgress((p) => ({ ...p, claims: p.claims + 1 }))
+          return
+        }
+        if (t === 'argument') {
+          const n = event.argument ? Math.min(5, event.argument.claims.length) : 0
+          setProgress((p) => ({ ...p, stages: [...p.stages, t], expected: n }))
+          return
+        }
+        // ingested | coherence | rhetoric | structural | reality | omission | verdict
+        setProgress((p) => ({ ...p, stages: [...p.stages, t] }))
       },
       onError: (message) => {
         setError(message)
@@ -337,18 +303,10 @@ export default function AnalyzePage() {
         )}
       </div>
 
-      {/* Live orchestration */}
-      {phase !== 'idle' && phase !== 'done' && (
+      {/* Live progress */}
+      {running && (
         <div className="mt-6">
-          <OrchestrationProgress
-            phase={phase}
-            article={article}
-            plan={plan}
-            issueMap={issueMap}
-            plannedDims={plannedDims}
-            completedKeys={new Set(completed.keys())}
-            claimsDone={claims !== null}
-          />
+          <PipelineProgress progress={progress} />
         </div>
       )}
       </div>

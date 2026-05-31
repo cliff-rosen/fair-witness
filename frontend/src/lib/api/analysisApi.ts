@@ -10,7 +10,7 @@
 import { api } from './index'
 import { subscribeToSSE } from './streamUtils'
 import { passphraseHeaders } from '../passphrase'
-import type { AnalysisEvent, BiasReport, ReportSummary } from '../../types/analysis'
+import type { FairnessEvent, FairnessReport, ReportSummary } from '../../types/analysis'
 
 export interface AnalyzeRequest {
   url?: string
@@ -37,13 +37,13 @@ export async function precheckArticle(request: AnalyzeRequest): Promise<Precheck
   return response.data
 }
 
-export async function analyzeArticle(request: AnalyzeRequest): Promise<BiasReport> {
-  const response = await api.post<BiasReport>('/api/analysis/analyze', request)
+export async function analyzeArticle(request: AnalyzeRequest): Promise<FairnessReport> {
+  const response = await api.post<FairnessReport>('/api/analysis/analyze', request)
   return response.data
 }
 
 export interface StreamHandlers {
-  onEvent: (event: AnalysisEvent) => void
+  onEvent: (event: FairnessEvent) => void
   onError?: (message: string) => void
   /** Called when the backend rejects the passphrase (HTTP 401). */
   onAuthError?: (message: string) => void
@@ -58,7 +58,7 @@ export function streamAnalysis(
   request: AnalyzeRequest,
   handlers: StreamHandlers,
 ): () => void {
-  return subscribeToSSE<AnalysisEvent>(
+  return subscribeToSSE<FairnessEvent>(
     '/api/analysis/stream',
     (event) => {
       handlers.onEvent(event)

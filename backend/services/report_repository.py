@@ -16,7 +16,7 @@ from sqlalchemy import select
 from config.settings import settings
 from database import AsyncSessionLocal
 from models import Report, Visit
-from schemas.analysis import BiasReport
+from schemas.analysis import FairnessReport
 
 logger = logging.getLogger(__name__)
 
@@ -40,14 +40,16 @@ def _summary(r: Report) -> dict:
     }
 
 
-async def save_report(report: BiasReport, content_hash: str, source_url: Optional[str]) -> str:
-    """Persist a completed report; stamp report_id/created_at onto it; return id."""
+async def save_report(report: FairnessReport, content_hash: str, source_url: Optional[str]) -> str:
+    """Persist a completed v2 report; stamp report_id/created_at onto it; return id.
+    The metadata columns power the Recent feed; the full report is in `payload`.
+    (presentation/substantive columns are reused for the coherence/correspondence axes.)"""
     rid = secrets.token_urlsafe(9)
     now = datetime.now(timezone.utc)
     report.report_id = rid
     report.created_at = now.isoformat()
 
-    o = report.overall
+    v = report.verdict
     async with AsyncSessionLocal() as s:
         s.add(
             Report(
@@ -56,12 +58,12 @@ async def save_report(report: BiasReport, content_hash: str, source_url: Optiona
                 content_hash=content_hash,
                 source_url=(source_url or None),
                 title=(report.article.title or "")[:512],
-                topic=(report.plan.topic or "")[:512],
-                overall_score=o.overall_score,
-                presentation_score=o.presentation_score,
-                substantive_score=o.substantive_score,
-                fairness_label=o.fairness_label,
-                political_lean=o.political_lean,
+                topic=(report.argument.topic or "")[:512],
+                overall_score=v.overall_score,
+                presentation_score=v.coherence_score,
+                substantive_score=v.correspondence_score,
+                fairness_label=v.fairness_label,
+                political_lean=v.political_lean,
                 payload=report.model_dump_json(),
             )
         )

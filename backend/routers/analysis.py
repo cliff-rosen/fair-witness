@@ -11,12 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, model_validator
 from sse_starlette.sse import EventSourceResponse
 
-from schemas.analysis import BiasReport, ExtractedArticle
+from schemas.analysis import ExtractedArticle, FairnessReport
 from security import require_app_password
 from services import report_repository
-from services.analysis_service import AnalysisService
 from services.article_service import ArticleService
 from services.content_id import compute_content_hash
+from services.fairness_service import FairnessService
 
 logger = logging.getLogger(__name__)
 
@@ -96,15 +96,15 @@ async def precheck(request: AnalyzeRequest) -> PrecheckResult:
     return PrecheckResult(existing=existing)
 
 
-@router.post("/analyze", response_model=BiasReport, dependencies=[Depends(require_app_password)])
-async def analyze(request: AnalyzeRequest) -> BiasReport:
-    """Blocking analysis: returns the full BiasReport when finished."""
+@router.post("/analyze", response_model=FairnessReport, dependencies=[Depends(require_app_password)])
+async def analyze(request: AnalyzeRequest) -> FairnessReport:
+    """Blocking analysis: returns the full FairnessReport when finished."""
     logger.info(f"analyze called - url={bool(request.url)} text={bool(request.text)}")
     try:
         article = await _ingest(request)
-        service = AnalysisService()
+        service = FairnessService()
         report = await service.analyze(article, _content_hash(request), request.effective_source_url())
-        logger.info(f"analyze complete - score={report.overall.overall_score}")
+        logger.info(f"analyze complete - overall={report.verdict.overall_score}")
         return report
     except HTTPException:
         raise
@@ -126,7 +126,7 @@ async def analyze_stream(request: AnalyzeRequest):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    service = AnalysisService()
+    service = FairnessService()
     content_hash = _content_hash(request)
     source_url = request.effective_source_url()
 
