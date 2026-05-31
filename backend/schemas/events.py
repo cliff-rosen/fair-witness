@@ -44,3 +44,48 @@ class AnalysisEvent(BaseModel):
     assessment: Optional[DimensionAssessment] = None
     claims: Optional[List[ClaimAssessment]] = None
     report: Optional[BiasReport] = None
+
+
+# --- v2 pipeline events (extract → ring0 ∥ ring1 → verdict) ---
+
+from schemas.analysis import (  # noqa: E402
+    ArgumentMap,
+    ClaimCheck,
+    CoherenceAssessment,
+    FairnessReport,
+    OmissionAssessment,
+    RealityModel,
+    RhetoricAssessment,
+    StructuralAssessment,
+    Verdict,
+)
+
+FairnessEventType = Literal[
+    "ingested",
+    "argument",      # ArgumentMap built
+    "coherence",     # Ring 0 facets land independently
+    "rhetoric",
+    "structural",
+    "reality",       # Ring 1 grounded map
+    "claim_check",   # one spine claim checked (streams in as they land)
+    "omission",
+    "verdict",
+    "report",        # terminal: full FairnessReport
+    "error",
+]
+
+
+class FairnessEvent(BaseModel):
+    type: FairnessEventType
+    message: Optional[str] = None
+
+    article: Optional[ExtractedArticle] = None
+    argument: Optional[ArgumentMap] = None
+    coherence: Optional[CoherenceAssessment] = None
+    rhetoric: Optional[RhetoricAssessment] = None
+    structural: Optional[StructuralAssessment] = None
+    reality: Optional[RealityModel] = None
+    claim_check: Optional[ClaimCheck] = None
+    omission: Optional[OmissionAssessment] = None
+    verdict: Optional[Verdict] = None
+    report: Optional[FairnessReport] = None

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fair Witness — Proposed Pipeline (visual)</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --card:#fff;
+    --r0:#0d9488; --r0bg:#ecfdf5; --r0line:#99f6e4;        /* Ring 0 · internal / coherence */
+    --r1:#d97706; --r1bg:#fffbeb; --r1line:#fde68a;        /* Ring 1 · external / correspondence */
+    --neutral:#4f46e5; --neutralbg:#eef2ff; --neutralline:#c7d2fe;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1040px;margin:0 auto;padding:32px 20px 80px;}
+  h1{font-size:28px;margin:0 0 4px;letter-spacing:-.02em;}
+  .sub{color:var(--muted);margin:0 0 20px;}
+  .bigidea{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;margin-bottom:18px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+  .bigidea b{color:var(--neutral)}
+  .legend{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 26px;font-size:13px}
+  .chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:4px 11px;border:1px solid var(--line);background:#fff}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .read{font-size:13px;color:var(--muted);margin:0 0 28px;padding-left:18px}
+  .read li{margin:2px 0}
+
+  /* flow */
+  .stage{position:relative;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--neutral);
+    border-radius:14px;padding:16px 18px;box-shadow:0 1px 3px rgba(15,23,42,.05)}
+  .stage.r0{border-left-color:var(--r0)} .stage.r1{border-left-color:var(--r1)}
+  .stage .head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .stage .name{font-weight:700;font-size:16px}
+  .stage .purpose{color:var(--muted);font-size:14px;margin:2px 0 12px}
+  .badge{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:6px;padding:2px 7px}
+  .b-neutral{background:var(--neutralbg);color:var(--neutral)}
+  .b-r0{background:var(--r0bg);color:var(--r0)} .b-r1{background:var(--r1bg);color:var(--r1)}
+  .ground{font-size:11px;font-weight:600;border-radius:6px;padding:2px 7px;margin-left:auto}
+  .g-text{background:#ecfdf5;color:#0d9488;border:1px solid #99f6e4}
+  .g-world{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+  .io{display:grid;grid-template-columns:64px 1fr;gap:6px 10px;font-size:13.5px;align-items:start}
+  .io .k{font-weight:700;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em;padding-top:3px}
+  .schema{background:#0f172a;color:#e2e8f0;border-radius:10px;padding:12px 14px;margin-top:6px;
+    font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow-x:auto}
+  .schema .t{color:#7dd3fc} .schema .c{color:#94a3b8;font-style:italic} .schema .new{color:#fca5a5}
+  .schema .ttl{color:#fcd34d;font-weight:700}
+  details>summary{cursor:pointer;color:var(--neutral);font-size:12.5px;font-weight:600;margin-top:8px;list-style:none}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary:before{content:"▸ ";}
+  details[open]>summary:before{content:"▾ ";}
+
+  .arrow{height:26px;position:relative}
+  .arrow:before{content:"";position:absolute;left:50%;top:0;bottom:6px;width:2px;background:var(--line);transform:translateX(-50%)}
+  .arrow:after{content:"▼";position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);color:#cbd5e1;font-size:12px}
+
+  .fanlabel{text-align:center;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin:6px 0}
+  .rings{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .ringcol{display:flex;flex-direction:column;gap:12px}
+  .ringhdr{border-radius:12px;padding:10px 14px;font-weight:700}
+  .ringhdr.r0{background:var(--r0bg);color:#0f766e;border:1px solid var(--r0line)}
+  .ringhdr.r1{background:var(--r1bg);color:#b45309;border:1px solid var(--r1line)}
+  .ringhdr small{display:block;font-weight:500;font-size:12px;opacity:.85;margin-top:2px}
+  .facet{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .facet .fn{font-weight:700;font-size:14px}
+  .facet .fd{color:var(--muted);font-size:12.5px;margin:2px 0 6px}
+  .facet code{font:12px ui-monospace,Menlo,Consolas,monospace;background:#f1f5f9;border-radius:5px;padding:1px 5px;color:#334155}
+
+  .spine{background:#fff7ed;border:1px dashed var(--r1);border-radius:10px;padding:10px 13px;font-size:13px;color:#9a3412;margin-top:4px}
+  .spine b{color:#7c2d12}
+
+  .delta{background:#fff;border:1px solid var(--line);border-left:5px solid #e11d48;border-radius:14px;padding:16px 18px;margin-top:30px}
+  .delta h3{margin:0 0 8px;font-size:15px}
+  .delta table{width:100%;border-collapse:collapse;font-size:13px}
+  .delta td{padding:7px 8px;border-top:1px solid var(--line);vertical-align:top}
+  .delta td.now{color:var(--muted)} .delta td.then{color:#0f766e;font-weight:600}
+  .delta th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:0 8px 4px}
+  .foot{margin-top:30px;color:var(--muted);font-size:12.5px;text-align:center}
+  @media(max-width:720px){.rings{grid-template-columns:1fr}.io{grid-template-columns:1fr}.io .k{padding-top:8px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Fair Witness — the pipeline, re-thought</h1>
+  <p class="sub">A proposed target architecture for discussion (not the current code). Draft.</p>
+
+  <div class="bigidea">
+    <b>The one idea:</b> extract the article's argument <i>once</i>, then judge it on <b>two independent axes</b>
+    — <span style="color:var(--r0);font-weight:700">Ring&nbsp;0 · does it cohere?</span> (internal: logic, consistency,
+    rhetoric — judged on the article's own terms) and <span style="color:var(--r1);font-weight:700">Ring&nbsp;1 · does it correspond?</span>
+    (external: is it true, what's missing — judged against reality). The split matters because Ring&nbsp;0 needs
+    <i>only the text</i> and we can do it confidently; Ring&nbsp;1 needs <i>the world</i> and is where grounding is required.
+  </div>
+
+  <div class="legend">
+    <span class="chip"><span class="dot" style="background:var(--neutral)"></span> Shared stage</span>
+    <span class="chip"><span class="dot" style="background:var(--r0)"></span> Ring 0 · internal / coherence</span>
+    <span class="chip"><span class="dot" style="background:var(--r1)"></span> Ring 1 · external / correspondence</span>
+    <span class="chip g-text">text-only ✓ grounded in the article</span>
+    <span class="chip g-world">needs the world ⚠ requires outside knowledge</span>
+  </div>
+
+  <ol class="read">
+    <li>Read top → bottom. Each card shows <b>IN</b> (what it receives) and <b>OUT</b> (the schema it produces).</li>
+    <li>The colored stripe = which ring. The right-hand badge = what it needs to be trusted.</li>
+    <li><span style="color:#dc2626">Red fields</span> in a schema = new / changed vs what we build today.</li>
+    <li>Click <b>▸ full schema</b> to expand details.</li>
+  </ol>
+
+  <!-- STAGE 1 -->
+  <div class="stage">
+    <div class="head"><span class="badge b-neutral">Stage 1 · shared</span><span class="name">Ingest</span>
+      <span class="ground g-text">text-only ✓</span></div>
+    <div class="purpose">Turn a URL or pasted text into clean article text + provenance. (Direct fetch → reader fallback → block detection.)</div>
+    <div class="io"><span class="k">in</span><span>a URL or pasted text (+ optional submitter source details)</span></div>
+    <div class="io"><span class="k">out</span><span><code>ExtractedArticle</code></span></div>
+    <div class="schema"><span class="ttl">ExtractedArticle</span>
+{ title, text, <span class="c">// the body we actually analyze</span>
+  source_url?, site_name?, byline?, published?, note?,
+  word_count, truncated }</div>
+  </div>
+
+  <div class="arrow"></div>
+
+  <!-- STAGE 2 -->
+  <div class="stage">
+    <div class="head"><span class="badge b-neutral">Stage 2 · shared</span><span class="name">Extract the argument</span>
+      <span class="ground g-text">text-only ✓</span></div>
+    <div class="purpose">Parse <i>what the piece is arguing</i> — not whether it's true. Classify genre, name the topic,
+      and build the <b>argument structure</b>: the thesis and the claims that hold it up. This is the substrate both rings operate on.</div>
+    <div class="io"><span class="k">in</span><span><code>ExtractedArticle</code></span></div>
+    <div class="io"><span class="k">out</span><span><code>ArgumentMap</code> &nbsp;<span style="color:#dc2626;font-size:12px;font-weight:700">(upgrade: today this is a flat claim list)</span></span></div>
+    <div class="schema"><span class="ttl">ArgumentMap</span>
+{ genre, topic, main_subject, summary,
+  <span class="new">thesis,</span>                         <span class="c">// the central point being argued</span>
+  <span class="new">claims[]: {</span>
+    <span class="new">id, text,</span>
+    <span class="new">kind,</span>            <span class="c">// fact | statistic | causal | prediction | opinion | value</span>
+    <span class="new">as_presented,</span>    <span class="c">// asserted | attributed | hedged</span>
+    <span class="new">supports[],</span>      <span class="c">// which claim/thesis ids this backs → the structure</span>
+    <span class="new">load_bearing</span>     <span class="c">// 0–100: how central to the thesis</span>
+  <span class="new">}</span> }</div>
+    <details><summary>full schema / why this changes</summary>
+      <div class="schema">The key upgrade is <span class="new">supports[]</span> + <span class="new">load_bearing</span>: instead of a flat list
+of claims, we capture <span class="ttl">how the claims connect into an argument</span>. That graph is exactly what the two
+rings need — Ring 0 tests whether it <i>holds together</i>; Ring 1 tests whether its <i>load-bearing pieces are true</i>.
+The set of high-<span class="t">load_bearing</span> claims = the "argument spine."</div>
+    </details>
+  </div>
+
+  <div class="arrow"></div>
+  <div class="fanlabel">fan out — both rings run off the ArgumentMap</div>
+
+  <div class="rings">
+    <!-- RING 0 -->
+    <div class="ringcol">
+      <div class="ringhdr r0">Ring 0 · Internal — “does it cohere?”
+        <small>judged on the article's own terms · needs only the text ✓</small></div>
+
+      <div class="facet">
+        <div class="fn">A · Logic &amp; argument</div>
+        <div class="fd">Does the thesis actually follow from the claims? Gaps, leaps, contradictions, circularity — does it close the loop A→Z?</div>
+        <code>CoherenceAssessment { score, follows_from_premises, gaps[], contradictions[], unsupported_leaps[], closes_loop, rationale }</code>
+        <div style="margin-top:6px;font-size:12px;color:#dc2626;font-weight:600">★ mostly missing today</div>
+      </div>
+
+      <div class="facet">
+        <div class="fn">B · Rhetoric &amp; style</div>
+        <div class="fd">Loaded/emotive language, tone bleeding into reporting, editorializing — the <i>manner</i>, with verbatim quotes.</div>
+        <code>RhetoricAssessment { score, loaded_language[]{quote,why}, tone, editorializing[], rationale }</code>
+        <div style="margin-top:6px;font-size:12px;color:#0f766e;font-weight:600">✓ ~ today's loaded_language / tone dimensions</div>
+      </div>
+
+      <div class="facet">
+        <div class="fn">C · Structural self-consistency</div>
+        <div class="fd">Does the headline/lede match the body? Are the piece's own claims attributed or just asserted? Is opinion separated from fact <i>within itself</i>?</div>
+        <code>StructuralAssessment { score, headline_matches_body, attribution_within_text, opinion_fact_separation, evidence[] }</code>
+        <div style="margin-top:6px;font-size:12px;color:#0f766e;font-weight:600">✓ ~ today's headline / attribution dimensions</div>
+      </div>
+    </div>
+
+    <!-- RING 1 -->
+    <div class="ringcol">
+      <div class="ringhdr r1">Ring 1 · External — “does it correspond?”
+        <small>judged against reality · needs the world ⚠</small></div>
+
+      <div class="spine">↳ <b>Seeded by the argument spine</b> from Ring 0: we only reality-check the <i>load-bearing</i> claims, not every sentence. <b>This is why internal precedes external.</b></div>
+
+      <div class="facet">
+        <div class="fn">Reality model (the "issue map")</div>
+        <div class="fd">An independent map of the debate: sides, settled facts, common biases. <b>Today: model memory. Proposed: retrieval-grounded with sources.</b></div>
+        <code>RealityModel { structure, sides[], settled_facts[], common_biases[], <span style="color:#dc2626">sources[]</span> }</code>
+        <div style="margin-top:6px;font-size:12px;color:#b45309;font-weight:600">⚠ the least-grounded thing we show today</div>
+      </div>
+
+      <div class="facet">
+        <div class="fn">Claim check (per load-bearing claim)</div>
+        <div class="fd">Does each spine claim match / contradict / lack support against the reality model? Is it handled fairly or overstated?</div>
+        <code>ClaimCheck[] { claim_id, verdict: supported|contradicted|unsupported|unverifiable, handling, <span style="color:#dc2626">sources[]</span> }</code>
+      </div>
+
+      <div class="facet">
+        <div class="fn">Omission &amp; framing</div>
+        <div class="fd">What relevant perspectives/facts are absent vs. what exists? Whose framing did it adopt? Both-sidesing vs. false-consensus.</div>
+        <code>OmissionAssessment { missing_perspectives[], missing_facts[], adopted_framing, both_sidesing, false_consensus, severity }</code>
+      </div>
+    </div>
+  </div>
+
+  <div class="arrow"></div>
+
+  <!-- SYNTHESIZE -->
+  <div class="stage">
+    <div class="head"><span class="badge b-neutral">Stage 4 · shared</span><span class="name">Synthesize → two-axis verdict</span></div>
+    <div class="purpose">Blend each ring into its own score. Keep them <b>separate</b> so a piece can be "tight reasoning, shaky facts" or vice-versa — and so the reader can see which axis is trustworthy.</div>
+    <div class="io"><span class="k">in</span><span>ArgumentMap + Ring 0 facets + Ring 1 facets</span></div>
+    <div class="io"><span class="k">out</span><span><code>Verdict</code></span></div>
+    <div class="schema"><span class="ttl">Verdict</span>
+{ <span class="new">coherence_score,</span>        <span class="c">// Ring 0 — high confidence, text-grounded</span>
+  <span class="new">correspondence_score,</span>   <span class="c">// Ring 1 — depends on the reality model</span>
+  overall_score, fairness_label, political_lean,
+  flags: { both_sidesing, false_consensus },
+  executive_summary, key_strengths[], key_concerns[] }</div>
+  </div>
+
+  <div class="arrow"></div>
+  <div class="stage" style="border-left-color:#475569">
+    <div class="head"><span class="badge b-neutral">Output</span><span class="name">BiasReport</span></div>
+    <div class="purpose">All slots assembled, streamed to the UI stage-by-stage. The report shows the two axes side by side, with Ring 0 findings and Ring 1 findings <b>visibly separated</b>.</div>
+    <div class="schema"><span class="ttl">BiasReport</span>
+{ article, argument_map, ring0{coherence, rhetoric, structural},
+  ring1{reality_model, claim_checks[], omission}, verdict }</div>
+  </div>
+
+  <!-- DELTA -->
+  <div class="delta">
+    <h3>What this changes vs. what we run today</h3>
+    <table>
+      <tr><th style="width:26%"></th><th>Today</th><th>Proposed</th></tr>
+      <tr><td><b>Extract</b></td><td class="now">flat list of claims</td><td class="then">argument structure (claims + support graph + load-bearing → a "spine")</td></tr>
+      <tr><td><b>Fan-out</b></td><td class="now">one bag of "dimensions" mixing style, framing &amp; omission</td><td class="then">clean split: Ring 0 (internal, text-only) vs Ring 1 (external, world)</td></tr>
+      <tr><td><b>Issue map</b></td><td class="now">front-loaded, blind to article, model-memory, shown most confidently</td><td class="then">Ring 1, seeded by the spine, ideally retrieval-grounded with sources</td></tr>
+      <tr><td><b>Logic / coherence</b></td><td class="now">barely assessed</td><td class="then">a first-class Ring 0 facet (does the argument actually hold together)</td></tr>
+      <tr><td><b>Verdict</b></td><td class="now">presentation vs substance (drawn as equals)</td><td class="then">coherence vs correspondence (separated; reader sees which is grounded)</td></tr>
+    </table>
+  </div>
+
+  <p class="foot">Fair Witness · proposed pipeline · a working sketch to argue over, not a spec.</p>
+
+</div>
+</body>
+</html>

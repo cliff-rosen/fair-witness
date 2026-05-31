@@ -117,6 +117,7 @@ function NoteLine({ note }: { note: string }) {
 
 export default function ReportView({ report }: { report: BiasReport }) {
   const { article, plan, issue_map, dimensions, claims, overall } = report
+  const plannedByKey = new Map(plan.dimensions.map((d) => [d.key, d]))
 
   const tabs: TabDef[] = [
     {
@@ -124,6 +125,20 @@ export default function ReportView({ report }: { report: BiasReport }) {
       label: 'Summary',
       content: (
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <dl className="mb-4 grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="inline font-semibold text-slate-500">Topic: </dt>
+              <dd className="inline text-slate-700">{plan.topic}</dd>
+            </div>
+            <div>
+              <dt className="inline font-semibold text-slate-500">Main subject: </dt>
+              <dd className="inline text-slate-700">{plan.main_subject}</dd>
+            </div>
+            <div>
+              <dt className="inline font-semibold text-slate-500">Type: </dt>
+              <dd className="inline text-slate-700">{plan.article_type}</dd>
+            </div>
+          </dl>
           <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
             What the article says
           </h3>
@@ -161,8 +176,28 @@ export default function ReportView({ report }: { report: BiasReport }) {
       content: (
         <div className="space-y-3">
           {dimensions.map((d) => (
-            <DimensionCard key={d.key} a={d} />
+            <DimensionCard key={d.key} a={d} planned={plannedByKey.get(d.key)} />
           ))}
+        </div>
+      ),
+    },
+    {
+      id: 'text',
+      label: 'Source text',
+      content: (
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
+            The exact text we analyzed
+          </h3>
+          {article.truncated && (
+            <p className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              This was truncated to fit the model’s budget — the analysis saw the first{' '}
+              {article.word_count.toLocaleString()} words.
+            </p>
+          )}
+          <div className="max-h-[28rem] overflow-y-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-relaxed text-slate-700">
+            {article.text}
+          </div>
         </div>
       ),
     },

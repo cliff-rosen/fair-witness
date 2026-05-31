@@ -34,10 +34,10 @@ export default function IssueMapView({ map }: { map: IssueMap }) {
                 {side.talking_points.map((tp, j) => (
                   <span
                     key={j}
-                    title={tp.status}
                     className={`rounded px-2 py-0.5 text-xs ${talkingPointBadge(tp.status)}`}
                   >
-                    {tp.point}
+                    {tp.point}{' '}
+                    <span className="opacity-70">· {tp.status.replace('-', ' ')}</span>
                   </span>
                 ))}
               </div>

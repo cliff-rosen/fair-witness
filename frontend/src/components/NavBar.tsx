@@ -1,4 +1,5 @@
 import { Link, NavLink } from 'react-router-dom'
+import ThemeToggle from './ThemeToggle'
 
 const links = [
   { to: '/', label: 'Analyze', end: true },
@@ -34,6 +35,7 @@ export default function NavBar() {
               {l.label}
             </NavLink>
           ))}
+          <ThemeToggle />
         </div>
       </nav>
     </header>

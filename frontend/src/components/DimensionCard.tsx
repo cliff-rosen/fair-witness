@@ -1,8 +1,14 @@
 import { useState } from 'react'
-import type { DimensionAssessment } from '../types/analysis'
+import type { DimensionAssessment, PlannedDimension } from '../types/analysis'
 import { leanLabel, scoreColor, scoreTrackColor, severityBadge } from '../lib/ui'
 
-export default function DimensionCard({ a }: { a: DimensionAssessment }) {
+export default function DimensionCard({
+  a,
+  planned,
+}: {
+  a: DimensionAssessment
+  planned?: PlannedDimension
+}) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -47,6 +53,19 @@ export default function DimensionCard({ a }: { a: DimensionAssessment }) {
 
       {open && (
         <div className="space-y-4 border-t border-slate-100 px-4 py-4">
+          {planned && (
+            <div className="rounded-lg bg-indigo-50/60 p-3 text-sm">
+              <p className="text-slate-700">
+                <span className="font-semibold text-slate-600">Why this lens:</span>{' '}
+                {planned.why_relevant}
+              </p>
+              {planned.focus && (
+                <p className="mt-1 text-slate-700">
+                  <span className="font-semibold text-slate-600">Focus:</span> {planned.focus}
+                </p>
+              )}
+            </div>
+          )}
           <p className="text-sm text-slate-700">{a.rationale}</p>
 
           {a.evidence.length > 0 && (

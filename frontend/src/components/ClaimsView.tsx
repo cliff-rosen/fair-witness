@@ -32,6 +32,12 @@ export default function ClaimsView({ claims }: { claims: ClaimAssessment[] }) {
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
                 {c.as_presented}
               </span>
+              <span
+                className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"
+                title="How load-bearing this claim is to the article's thesis (0–100)"
+              >
+                centrality {c.centrality}
+              </span>
             </div>
             <p className="mt-2 text-sm text-slate-600">{c.note}</p>
           </div>

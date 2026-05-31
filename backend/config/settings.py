@@ -56,6 +56,14 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
     # Model used by every prompt caller unless overridden per-caller.
     CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-20250514")
+    # Cheaper/faster model for the Ring 1 web-research agent loop (many calls).
+    WEB_MODEL: str = os.getenv("WEB_MODEL", "claude-haiku-4-5-20251001")
+    # Cap on search/fetch rounds per Ring 1 agent (bounds cost + latency).
+    WEB_MAX_STEPS: int = int(os.getenv("WEB_MAX_STEPS", "5"))
+
+    # --- Web search (Ring 1 grounding) — Google Programmable Search ---
+    GOOGLE_SEARCH_API_KEY: str = os.getenv("GOOGLE_SEARCH_API_KEY", "")
+    GOOGLE_SEARCH_ENGINE_ID: str = os.getenv("GOOGLE_SEARCH_ENGINE_ID", "")
 
     # --- Orchestration knobs ---
     # Cap on concurrent dimension evaluators in the fan-out stage.

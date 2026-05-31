@@ -14,4 +14,74 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* ============================================================
+   Dark mode — toggled by a `dark` class on <html>.
+   The app reuses a small set of Tailwind surface/text/border
+   classes everywhere, so we remap those here instead of
+   annotating every component. Score colors and the indigo /
+   Facebook accents are intentionally preserved.
+   ============================================================ */
+.dark { color-scheme: dark; }
+.dark body { background: #0b1220; color: #e2e8f0; }
+
+/* surfaces */
+.dark .bg-white { background-color: #1e293b !important; }
+.dark .bg-white\/90 { background-color: rgba(15, 23, 42, 0.9) !important; }
+.dark .bg-slate-50 { background-color: #0f172a !important; }
+.dark .bg-slate-50\/60 { background-color: rgba(30, 41, 59, 0.55) !important; }
+.dark .bg-slate-100 { background-color: #334155 !important; }
+
+/* text */
+.dark .text-slate-800 { color: #e2e8f0 !important; }
+.dark .text-slate-700 { color: #cbd5e1 !important; }
+.dark .text-slate-600 { color: #aeb9c9 !important; }
+.dark .text-slate-500 { color: #94a3b8 !important; }
+.dark .text-slate-400 { color: #7c8aa0 !important; }
+
+/* borders */
+.dark .border-slate-200 { border-color: #334155 !important; }
+.dark .border-slate-100 { border-color: #24324a !important; }
+.dark .border-slate-300 { border-color: #475569 !important; }
+.dark .border-indigo-100,
+.dark .border-indigo-200,
+.dark .border-amber-200,
+.dark .border-red-200 { border-color: #3b4a63 !important; }
+
+/* form fields */
+.dark input,
+.dark textarea {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: #64748b; }
+
+/* tinted callouts + pastel badges -> muted dark equivalents */
+.dark .bg-indigo-50,
+.dark .bg-indigo-50\/60 { background-color: rgba(99, 102, 241, 0.14) !important; }
+.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.12) !important; }
+.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.12) !important; }
+.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12) !important; }
+.dark .bg-green-100 { background-color: rgba(34, 197, 94, 0.20) !important; }
+.dark .bg-lime-100 { background-color: rgba(132, 204, 22, 0.20) !important; }
+.dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.20) !important; }
+.dark .bg-orange-100 { background-color: rgba(249, 115, 22, 0.20) !important; }
+.dark .bg-red-100 { background-color: rgba(239, 68, 68, 0.20) !important; }
+.dark .bg-indigo-100 { background-color: rgba(99, 102, 241, 0.22) !important; }
+
+.dark .text-indigo-700,
+.dark .text-indigo-600 { color: #a5b4fc !important; }
+.dark .text-amber-800,
+.dark .text-amber-700 { color: #fcd34d !important; }
+.dark .text-green-900,
+.dark .text-green-800,
+.dark .text-green-700 { color: #86efac !important; }
+.dark .text-red-900,
+.dark .text-red-800,
+.dark .text-red-700,
+.dark .text-red-600 { color: #fca5a5 !important; }
+.dark .text-orange-800 { color: #fdba74 !important; }
+.dark .text-lime-800 { color: #bef264 !important; }
