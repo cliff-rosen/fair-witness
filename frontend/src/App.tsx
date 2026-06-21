@@ -6,6 +6,7 @@ import HighlightsPage from './pages/HighlightsPage'
 import AboutPage from './pages/AboutPage'
 import ReportPage from './pages/ReportPage'
 import AdminPage from './pages/AdminPage'
+import DiagnosticsPage from './pages/DiagnosticsPage'
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/recent" element={<RecentPage />} />
         <Route path="/highlights" element={<HighlightsPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/diagnostics" element={<DiagnosticsPage />} />
         {/* Public shareable report — no passphrase required. */}
         <Route path="/r/:id" element={<ReportPage />} />
         {/* Unlisted admin tracking dashboard (separate password). */}

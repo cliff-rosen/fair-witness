@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from config import setup_logging, settings
-from routers import admin, analysis, reports
+from routers import admin, analysis, boe, reports
 
 logger = setup_logging()
 logger.info(f"{settings.APP_NAME} v{settings.SETTING_VERSION} starting")
@@ -23,6 +23,7 @@ app.add_middleware(
 app.include_router(analysis.router)
 app.include_router(reports.router)
 app.include_router(admin.router)
+app.include_router(boe.router)
 
 
 @app.on_event("startup")
