@@ -1,4 +1,4 @@
-"""v3 Stage 4 — Synthesize the two-axis verdict.
+"""Stage 4 — Synthesize the two-axis verdict.
 
 Reasons over everything already gathered (claims + map + placements). Keeps the
 two axes honest: SUBSTANTIVE is how well the article tracks the map; PRESENTATION
@@ -9,8 +9,8 @@ the article's claims sit against the map's structure.
 from typing import List, Tuple
 
 from agents.base_prompt_caller import BasePromptCaller
-from agents.boe_topic_mapper import brief_topic_map
-from schemas.boe import ClaimPlacement, ClaimSet, TopicMap, Verdict
+from agents.analyze_topic_mapper import brief_topic_map
+from schemas.analyze import ClaimPlacement, ClaimSet, TopicMap, Verdict
 
 
 def _render_placements(placements: List[ClaimPlacement]) -> str:
@@ -21,7 +21,7 @@ def _render_placements(placements: List[ClaimPlacement]) -> str:
     return "\n".join(lines) or "  (none)"
 
 
-class BoeSynthesizer(BasePromptCaller):
+class Synthesizer(BasePromptCaller):
     def __init__(self) -> None:
         system_message = """You write the final fairness verdict from how an article's claims sit against
 an independent, grounded map of the topic.

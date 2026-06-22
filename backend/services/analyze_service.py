@@ -1,4 +1,4 @@
-"""v3 orchestrator — the "best of both" pipeline, with complete diagnostics.
+"""The analyze orchestrator, with complete diagnostics.
 
     Extract claims → Topic map (blind, web) → Place claims on map → Verdict
 
@@ -12,14 +12,14 @@ import logging
 import time
 from typing import Any, Awaitable, Callable, Optional, Tuple
 
-from agents.boe_extractor import ClaimExtractor
-from agents.boe_placer import ClaimPlacer
-from agents.boe_synth import BoeSynthesizer
-from agents.boe_topic_mapper import TopicMapper
+from agents.analyze_extractor import ClaimExtractor
+from agents.analyze_placer import ClaimPlacer
+from agents.analyze_synth import Synthesizer
+from agents.analyze_topic_mapper import TopicMapper
 from schemas.analysis import ExtractedArticle
-from schemas.boe import (
+from schemas.analyze import (
+    AnalyzeReport,
     AnalyzeResult,
-    BoeReport,
     ClaimSet,
     PipelineDiagnostics,
     StageRecord,
@@ -96,14 +96,14 @@ class Recorder:
         )
 
 
-class BestOfBothService:
+class AnalyzeService:
     """extract → map → place → verdict, with full per-stage diagnostics."""
 
     def __init__(self) -> None:
         self.extractor = ClaimExtractor()
         self.mapper = TopicMapper()
         self.placer = ClaimPlacer()
-        self.synth = BoeSynthesizer()
+        self.synth = Synthesizer()
 
     async def analyze(self, article: ExtractedArticle) -> AnalyzeResult:
         rec = Recorder()
@@ -137,7 +137,7 @@ class BestOfBothService:
             lambda: self.synth.synthesize(claims, topic_map, placements),
         )
 
-        report = BoeReport(
+        report = AnalyzeReport(
             article=article,
             claims=claims,
             topic_map=topic_map,
@@ -150,7 +150,7 @@ class BestOfBothService:
             total_ms=int((time.monotonic() - t0) * 1000),
         )
         logger.info(
-            f"v3 analysis complete: overall={verdict.overall_score} "
+            f"analyze complete: overall={verdict.overall_score} "
             f"(substantive={verdict.substantive_score}, presentation={verdict.presentation_score})"
         )
         return AnalyzeResult(report=report, diagnostics=diagnostics)

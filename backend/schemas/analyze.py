@@ -1,6 +1,6 @@
-"""Schemas for the "best of both" (v3) pipeline + its diagnostics.
+"""Schemas for the analyze pipeline + its diagnostics.
 
-The v3 pipeline merges the two strengths we identified across v1 and v2:
+The pipeline has four stages:
 
   1. EXTRACT   — pull the article's load-bearing claims (precise claim list).
   2. TOPIC MAP — build, BLIND to the article, a cited map of the debate:
@@ -213,8 +213,8 @@ class Verdict(BaseModel):
 # Assembled report
 # ---------------------------------------------------------------------------
 
-class BoeReport(BaseModel):
-    """The complete v3 report: extract → map → place → verdict."""
+class AnalyzeReport(BaseModel):
+    """The complete report: extract → map → place → verdict."""
 
     article: ExtractedArticle
     claims: ClaimSet
@@ -261,14 +261,14 @@ class StageRecord(BaseModel):
 class PipelineDiagnostics(BaseModel):
     """The full trace of a single run, every stage in order."""
 
-    pipeline: str = "v3-best-of-both"
+    pipeline: str = "analyze"
     article_title: str = ""
     stages: List[StageRecord] = Field(default_factory=list)
     total_ms: int = 0
 
 
 class AnalyzeResult(BaseModel):
-    """What the v3 endpoint returns: the report plus the complete diagnostics."""
+    """What the analyze endpoint returns: the report plus the complete diagnostics."""
 
-    report: BoeReport
+    report: AnalyzeReport
     diagnostics: PipelineDiagnostics

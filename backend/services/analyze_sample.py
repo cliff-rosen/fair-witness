@@ -1,4 +1,4 @@
-"""A realistic, fully-populated v3 sample run.
+"""A realistic, fully-populated analyze sample run.
 
 Lets the diagnostics screen render immediately (and CI/dev demo it) without
 spending any API calls. The system prompts are read from the real agent classes
@@ -8,14 +8,14 @@ data based on a real article.
 
 import time
 
-from agents.boe_extractor import ClaimExtractor
-from agents.boe_placer import ClaimPlacer
-from agents.boe_synth import BoeSynthesizer
-from agents.boe_topic_mapper import TopicMapper
+from agents.analyze_extractor import ClaimExtractor
+from agents.analyze_placer import ClaimPlacer
+from agents.analyze_synth import Synthesizer
+from agents.analyze_topic_mapper import TopicMapper
 from schemas.analysis import ExtractedArticle
-from schemas.boe import (
+from schemas.analyze import (
+    AnalyzeReport,
     AnalyzeResult,
-    BoeReport,
     Claim,
     ClaimPlacement,
     ClaimSet,
@@ -166,11 +166,11 @@ def build_sample() -> AnalyzeResult:
     verdict = _verdict()
 
     # Real system prompts (constructors make no network calls).
-    extractor, mapper, placer, synth = ClaimExtractor(), TopicMapper(), ClaimPlacer(), BoeSynthesizer()
+    extractor, mapper, placer, synth = ClaimExtractor(), TopicMapper(), ClaimPlacer(), Synthesizer()
 
-    from agents.boe_topic_mapper import brief_topic_map
-    from agents.boe_placer import _render_claims
-    from agents.boe_synth import _render_placements
+    from agents.analyze_topic_mapper import brief_topic_map
+    from agents.analyze_placer import _render_claims
+    from agents.analyze_synth import _render_placements
 
     stages = [
         StageRecord(
@@ -211,7 +211,7 @@ def build_sample() -> AnalyzeResult:
         ),
     ]
 
-    report = BoeReport(article=article, claims=claims, topic_map=topic_map, placements=placements, verdict=verdict)
+    report = AnalyzeReport(article=article, claims=claims, topic_map=topic_map, placements=placements, verdict=verdict)
     diagnostics = PipelineDiagnostics(
         article_title=article.title,
         stages=stages,

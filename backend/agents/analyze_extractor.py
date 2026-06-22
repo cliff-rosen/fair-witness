@@ -1,4 +1,4 @@
-"""v3 Stage 1 — Extract the article's load-bearing claims.
+"""Stage 1 — Extract the article's load-bearing claims.
 
 Looks ONLY at the article. Pulls what it is (genre/topic/thesis) and the handful
 of claims it rests on, with how each is presented and how central it is. No
@@ -8,7 +8,7 @@ fact-checking here — that happens once the topic map exists.
 from typing import Tuple
 
 from agents.base_prompt_caller import BasePromptCaller
-from schemas.boe import ClaimSet
+from schemas.analyze import ClaimSet
 
 
 class ClaimExtractor(BasePromptCaller):

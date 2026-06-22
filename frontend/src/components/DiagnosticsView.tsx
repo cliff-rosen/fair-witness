@@ -9,7 +9,7 @@
  */
 
 import { useRef } from 'react'
-import type { PipelineDiagnostics, StageRecord, WebStep } from '../types/boe'
+import type { PipelineDiagnostics, StageRecord, WebStep } from '../types/analyze'
 import JsonView from './JsonView'
 
 const KIND_CHIP: Record<string, string> = {

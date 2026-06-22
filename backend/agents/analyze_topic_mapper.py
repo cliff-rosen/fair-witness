@@ -1,15 +1,15 @@
-"""v3 Stage 2 — Map the topic, blind to the article, grounded on the web.
+"""Stage 2 — Map the topic, blind to the article, grounded on the web.
 
-This is the heart of the "best of both": v1's richly-structured debate map
-(sides, each with talking points flagged by substantiation) built on v2's web
-grounding (real sources). It never sees the article, so it can serve as a
-neutral yardstick the claims are later snapped onto.
+Builds a richly-structured map of the debate — sides, each with talking points
+flagged by substantiation, plus settled facts — grounded in real web sources.
+It never sees the article, so it serves as a neutral yardstick the claims are
+later snapped onto.
 """
 
 from typing import Tuple
 
 from agents.agentic_caller import AgenticPromptCaller
-from schemas.boe import TopicMap
+from schemas.analyze import TopicMap
 
 
 def brief_topic_map(tm: TopicMap) -> str:

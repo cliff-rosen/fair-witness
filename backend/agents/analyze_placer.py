@@ -1,4 +1,4 @@
-"""v3 Stage 3 — Place each claim on the topic map.
+"""Stage 3 — Place each claim on the topic map.
 
 The merge point. For every extracted claim it makes ONE combined call against the
 independent topic map: WHERE the claim sits (settled fact / contradicts settled
@@ -10,8 +10,8 @@ applies. No new web research — it reasons over the map already gathered.
 from typing import List, Tuple
 
 from agents.base_prompt_caller import BasePromptCaller
-from agents.boe_topic_mapper import brief_topic_map
-from schemas.boe import ClaimPlacement, ClaimSet, PlacementSet, TopicMap
+from agents.analyze_topic_mapper import brief_topic_map
+from schemas.analyze import ClaimPlacement, ClaimSet, PlacementSet, TopicMap
 
 
 def _render_claims(claims: ClaimSet) -> str:

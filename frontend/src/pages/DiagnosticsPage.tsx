@@ -4,12 +4,12 @@
  */
 
 import { useState } from 'react'
-import { analyzeV3, getSampleV3, type V3Request } from '../lib/api/boeApi'
+import { analyze, getSample, type AnalyzeRequest } from '../lib/api/analyzeApi'
 import { handleApiError } from '../lib/api'
 import { getPassphrase, setPassphrase } from '../lib/passphrase'
 import PassphraseModal from '../components/PassphraseModal'
 import DiagnosticsView from '../components/DiagnosticsView'
-import type { AnalyzeResult } from '../types/boe'
+import type { AnalyzeResult } from '../types/analyze'
 
 type Mode = 'url' | 'text'
 
@@ -24,7 +24,7 @@ export default function DiagnosticsPage() {
   const [showPass, setShowPass] = useState(false)
   const [passError, setPassError] = useState<string | null>(null)
 
-  function buildRequest(): V3Request {
+  function buildRequest(): AnalyzeRequest {
     return mode === 'url' ? { url: url.trim() } : { text: text.trim() }
   }
 
@@ -39,7 +39,7 @@ export default function DiagnosticsPage() {
     setError(null)
     setLoading(true)
     try {
-      const res = await analyzeV3(buildRequest())
+      const res = await analyze(buildRequest())
       setResult(res)
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } }).response?.status
@@ -58,7 +58,7 @@ export default function DiagnosticsPage() {
     setError(null)
     setLoading(true)
     try {
-      setResult(await getSampleV3())
+      setResult(await getSample())
     } catch (e: unknown) {
       setError(handleApiError(e))
     } finally {
@@ -80,7 +80,7 @@ export default function DiagnosticsPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-slate-800">Pipeline diagnostics</h1>
         <p className="mt-1 text-sm text-slate-500">
-          Run the v3 “best of both” analysis and inspect the input and output of every step.
+          Run the analysis and inspect the input and output of every step.
         </p>
       </header>
 

@@ -1,4 +1,4 @@
-/** Types for the v3 "best of both" pipeline + its diagnostics. Mirrors backend/schemas/boe.py. */
+/** Types for the analyze pipeline + its diagnostics. Mirrors backend/schemas/analyze.py. */
 
 export type AsPresented = 'asserted' | 'attributed' | 'hedged'
 export type IssueStructure = 'settled' | 'genuinely-two-sided' | 'multi-sided' | 'not-adversarial'
@@ -75,7 +75,7 @@ export interface Verdict {
   concerns: string[]
 }
 
-export interface BoeReport {
+export interface AnalyzeReport {
   article: { title: string; text: string; word_count: number; site_name?: string | null; byline?: string | null }
   claims: ClaimSet
   topic_map: TopicMap
@@ -119,6 +119,6 @@ export interface PipelineDiagnostics {
 }
 
 export interface AnalyzeResult {
-  report: BoeReport
+  report: AnalyzeReport
   diagnostics: PipelineDiagnostics
 }
